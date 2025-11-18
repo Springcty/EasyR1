@@ -50,17 +50,24 @@ def _get_logit_bias(processor: Optional[ProcessorMixin]) -> Optional[dict[int, f
 
 
 def _process_multi_modal_data(
-    multi_modal_data: dict[str, Any], min_pixels: int, max_pixels: int, video_fps: float
+    multi_modal_data: dict[str, Any], nframes: Optional[int] = None, resized_height: Optional[int] = None, resized_width: Optional[int] = None, min_pixels: Optional[int] = None, max_pixels: Optional[int] = None, video_fps: Optional[float] = None
 ) -> dict[str, Any]:
+    # debugging
+    print('=' * 20)
+    print(multi_modal_data["videos"])
+    print(multi_modal_data["images"])
     # may convert image path to image object
     images, videos = [], []
     if "images" in multi_modal_data:
         for image in multi_modal_data["images"]:
-            images.append(process_image(image, min_pixels, max_pixels))
+            images.append(process_image(image, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels))
 
     if "videos" in multi_modal_data:
         for video in multi_modal_data["videos"]:
-            videos.append(process_video(video, min_pixels, max_pixels, video_fps))
+            videos.append(process_video(video, nframes=nframes, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels, video_fps=video_fps, return_video_metadata=True))
+
+    if len(images) != 0 and len(videos) != 0:
+        return {"image": images, "video": videos}
 
     if len(images) != 0:
         return {"image": images}
@@ -178,9 +185,12 @@ class vLLMRollout(BaseRollout):
                         "prompt_token_ids": list(raw_prompt_ids),
                         "multi_modal_data": _process_multi_modal_data(
                             multi_modal_data,
-                            prompts.meta_info["min_pixels"],
-                            prompts.meta_info["max_pixels"],
-                            prompts.meta_info["video_fps"],
+                            prompts.meta_info.get("nframes", None),
+                            prompts.meta_info.get("resized_height", None),
+                            prompts.meta_info.get("resized_width", None),
+                            prompts.meta_info.get("min_pixels", None),
+                            prompts.meta_info.get("max_pixels", None),
+                            prompts.meta_info.get("video_fps", None),
                         ),
                     }
                 )

@@ -173,7 +173,7 @@ if __name__ == "__main__":
         raise NotImplementedError(f"Unknown architecture {architectures}.")
 
     with torch.device("meta"):
-        model: PreTrainedModel = AutoClass.from_config(config, torch_dtype=torch.bfloat16)
+        model: PreTrainedModel = AutoClass.from_config(config, dtype=torch.bfloat16)
 
     assert isinstance(model, PreTrainedModel)
     model.to_empty(device="cpu")

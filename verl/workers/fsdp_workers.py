@@ -201,7 +201,7 @@ class FSDPWorker(Worker):
             model = AutoClass.from_pretrained(
                 model_config.model_path,
                 config=self.model_config,
-                torch_dtype=torch_dtype,
+                dtype=torch_dtype,
                 attn_implementation="flash_attention_2",
                 device_map="cpu" if fsdp_config.enable_rank0_init else "cuda",
                 low_cpu_mem_usage=True,
@@ -211,7 +211,7 @@ class FSDPWorker(Worker):
             with no_init_weights(), init_empty_weights():
                 model = AutoClass.from_config(
                     self.model_config,
-                    torch_dtype=torch_dtype,
+                    dtype=torch_dtype,
                     attn_implementation="flash_attention_2",
                     trust_remote_code=model_config.trust_remote_code,
                 )
@@ -463,9 +463,12 @@ class FSDPWorker(Worker):
             self._cache.clear()
 
         if "multi_modal_inputs" not in self._cache:
-            min_pixels = data.meta_info["min_pixels"]
-            max_pixels = data.meta_info["max_pixels"]
-            video_fps = data.meta_info["video_fps"]
+            min_pixels = data.meta_info.get("min_pixels", None)
+            max_pixels = data.meta_info.get("max_pixels", None)
+            video_fps = data.meta_info.get("video_fps", None)
+            resized_height = data.meta_info.get("resized_height", None)
+            resized_width = data.meta_info.get("resized_width", None)
+            nframes = data.meta_info.get("nframes", None)
             batch_multi_modal_inputs = []
             multi_modal_inputs_cache = {}  # avoid repeated processing for n > 1 samples
             for index, multi_modal_data in zip(
@@ -475,17 +478,26 @@ class FSDPWorker(Worker):
                     images, videos = [], []
                     if "images" in multi_modal_data:
                         for image in multi_modal_data["images"]:
-                            images.append(process_image(image, min_pixels, max_pixels))
+                            images.append(process_image(image, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels))
 
                     if "videos" in multi_modal_data:
                         for video in multi_modal_data["videos"]:
-                            videos.append(process_video(video, min_pixels, max_pixels, video_fps))
+                            videos.append(process_video(video, nframes=nframes, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels, video_fps=video_fps, return_video_metadata=False))
 
-                    if len(images) != 0:
+                    if len(images) != 0 and len(videos) != 0:
                         # it's necessary to add `dict` to properly convert batch features to dict
                         # otherwise the batch features will be converted to dict keys
                         # see https://github.com/hiyouga/EasyR1/pull/339
-                        multi_modal_inputs = dict(self.processor.image_processor(images=images, return_tensors="pt"))
+                        multi_modal_inputs = dict(
+                            self.processor.image_processor(images=images, videos=videos, return_tensors="pt")
+                        )
+                    elif len(images) != 0:
+                        # it's necessary to add `dict` to properly convert batch features to dict
+                        # otherwise the batch features will be converted to dict keys
+                        # see https://github.com/hiyouga/EasyR1/pull/339
+                        multi_modal_inputs = dict(
+                            self.processor.image_processor(images=images, videos=None, return_tensors="pt")
+                        )
                     elif len(videos) != 0:
                         multi_modal_inputs = dict(
                             self.processor.image_processor(images=None, videos=videos, return_tensors="pt")
