@@ -35,6 +35,7 @@ from transformers import (
     PreTrainedModel,
 )
 from transformers.modeling_utils import no_init_weights
+from qwen_vl_utils import process_vision_info
 
 from ..models.monkey_patch import apply_ulysses_patch
 from ..protocol import DataProto
@@ -467,47 +468,28 @@ class FSDPWorker(Worker):
             self._cache.clear()
 
         if "multi_modal_inputs" not in self._cache:
-            min_pixels = data.meta_info.get("min_pixels", None)
-            max_pixels = data.meta_info.get("max_pixels", None)
-            video_fps = data.meta_info.get("video_fps", None)
-            resized_height = data.meta_info.get("resized_height", None)
-            resized_width = data.meta_info.get("resized_width", None)
-            nframes = data.meta_info.get("nframes", None)
             batch_multi_modal_inputs = []
             multi_modal_inputs_cache = {}  # avoid repeated processing for n > 1 samples
-            for index, multi_modal_data in zip(
-                data.non_tensor_batch["uid"], data.non_tensor_batch["multi_modal_data"]
+            
+            for index, messages in zip(
+                data.non_tensor_batch["uid"], data.non_tensor_batch["messages"]
             ):  # process multi modal data per sample
                 if index not in multi_modal_inputs_cache:
-                    images, videos = [], []
-                    if "images" in multi_modal_data:
-                        for image in multi_modal_data["images"]:
-                            images.append(process_image(image, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels))
-
-                    if "videos" in multi_modal_data:
-                        for video in multi_modal_data["videos"]:
-                            videos.append(process_video(video, nframes=nframes, resized_height=resized_height, resized_width=resized_width, min_pixels=min_pixels, max_pixels=max_pixels, video_fps=video_fps, return_video_metadata=False))
-
-                    if len(images) != 0 and len(videos) != 0:
-                        # it's necessary to add `dict` to properly convert batch features to dict
-                        # otherwise the batch features will be converted to dict keys
-                        # see https://github.com/hiyouga/EasyR1/pull/339
-                        multi_modal_inputs = dict(
-                            self.processor.image_processor(images=images, videos=videos, return_tensors="pt")
-                        )
-                    elif len(images) != 0:
-                        # it's necessary to add `dict` to properly convert batch features to dict
-                        # otherwise the batch features will be converted to dict keys
-                        # see https://github.com/hiyouga/EasyR1/pull/339
-                        multi_modal_inputs = dict(
-                            self.processor.image_processor(images=images, videos=None, return_tensors="pt")
-                        )
-                    elif len(videos) != 0:
-                        multi_modal_inputs = dict(
-                            self.processor.image_processor(images=None, videos=videos, return_tensors="pt")
-                        )
+                    prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+                    processed_images, processed_videos, video_kwargs = process_vision_info(messages, return_video_kwargs=True, return_video_metadata=True, image_patch_size=16)
+                    if processed_videos is not None:
+                        processed_videos, video_metadatas = zip(*processed_videos)
+                        processed_videos, video_metadatas = list(processed_videos), list(video_metadatas)
                     else:
-                        multi_modal_inputs = {}
+                        video_metadatas = None
+
+                    model_inputs = self.processor(text=[prompt], images=processed_images, videos=processed_videos, video_metadata=video_metadatas, return_tensors="pt", add_special_tokens=False, do_resize=True, padding=True, **video_kwargs)
+                    multi_modal_inputs = {
+                        "pixel_values": model_inputs.get("pixel_values", None),
+                        "image_grid_thw": model_inputs.get("image_grid_thw", None),
+                        "pixel_values_videos": model_inputs.get("pixel_values_videos", None),
+                        "video_grid_thw": model_inputs.get("video_grid_thw", None),
+                    }
 
                     multi_modal_inputs_cache[index] = multi_modal_inputs
 

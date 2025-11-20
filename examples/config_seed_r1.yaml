@@ -87,7 +87,6 @@ worker:
       offload_params: false
 
   reward:
-    reward_type: batch
     reward_function: ./examples/reward_function/mcq_reward.py:compute_score
 
 trainer:
@@ -100,12 +99,12 @@ trainer:
   n_gpus_per_node: 2
   max_try_make_batch: 20  # -1 means no limit
   val_freq: 5  # -1 to disable
-  val_before_train: false
+  val_before_train: true
   val_only: false
   val_generations_to_log: 3
   save_freq: 5  # -1 to disable
   save_limit: 3  # -1 to disable
   save_model_only: false
-  save_checkpoint_path: null
+  save_checkpoint_path: /data/user_data/tianyuca/RL_sabotage/results
   load_checkpoint_path: null
   find_last_checkpoint: true

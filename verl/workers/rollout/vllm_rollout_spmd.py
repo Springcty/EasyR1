@@ -52,10 +52,6 @@ def _get_logit_bias(processor: Optional[ProcessorMixin]) -> Optional[dict[int, f
 def _process_multi_modal_data(
     multi_modal_data: dict[str, Any], nframes: Optional[int] = None, resized_height: Optional[int] = None, resized_width: Optional[int] = None, min_pixels: Optional[int] = None, max_pixels: Optional[int] = None, video_fps: Optional[float] = None
 ) -> dict[str, Any]:
-    # debugging
-    print('=' * 20)
-    print(multi_modal_data["videos"])
-    print(multi_modal_data["images"])
     # may convert image path to image object
     images, videos = [], []
     if "images" in multi_modal_data:

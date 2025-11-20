@@ -64,30 +64,8 @@ def process_image(
         ele["min_pixels"] = min_pixels
     if max_pixels is not None:
         ele["max_pixels"] = max_pixels
-    
-    return fetch_image(ele)
-    # if isinstance(image, str):
-    #     image = Image.open(image)
-    # elif isinstance(image, dict):
-    #     image = Image.open(BytesIO(image["bytes"]))
-    # elif isinstance(image, bytes):
-    #     image = Image.open(BytesIO(image))
 
-    # image.load()  # avoid "Too many open files" errors
-    # if max_pixels is not None and (image.width * image.height) > max_pixels:
-    #     resize_factor = math.sqrt(max_pixels / (image.width * image.height))
-    #     width, height = int(image.width * resize_factor), int(image.height * resize_factor)
-    #     image = image.resize((width, height))
-
-    # if min_pixels is not None and (image.width * image.height) < min_pixels:
-    #     resize_factor = math.sqrt(min_pixels / (image.width * image.height))
-    #     width, height = int(image.width * resize_factor), int(image.height * resize_factor)
-    #     image = image.resize((width, height))
-
-    # if image.mode != "RGB":
-    #     image = image.convert("RGB")
-
-    # return image
+    return fetch_image(ele, image_patch_size=16)
 
 
 def process_video(
@@ -108,7 +86,7 @@ def process_video(
         vision_info["min_pixels"] = min_pixels
         vision_info["max_pixels"] = max_pixels
 
-    return fetch_video(vision_info, return_video_sample_fps=return_fps, return_video_metadata=return_video_metadata)
+    return fetch_video(vision_info, image_patch_size=16, return_video_sample_fps=return_fps, return_video_metadata=return_video_metadata)
 
 
 class RLHFDataset(Dataset):
@@ -344,7 +322,8 @@ class RLHFDataset(Dataset):
 
         if self.image_key in example and self.video_key in example and len(example[self.image_key]) > 0 and len(example[self.video_key]) > 0:            
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-            processed_images, processed_videos, video_kwargs = process_vision_info(messages, return_video_kwargs=True, return_video_metadata=True)
+            processed_images, processed_videos, video_kwargs = process_vision_info(messages, return_video_kwargs=True, return_video_metadata=True, image_patch_size=16)
+            
             if processed_videos is not None:
                 processed_videos, video_metadatas = zip(*processed_videos)
                 processed_videos, video_metadatas = list(processed_videos), list(video_metadatas)
@@ -352,7 +331,8 @@ class RLHFDataset(Dataset):
                 video_metadatas = None
             video_fps_list = video_kwargs.get('fps', None)
 
-            model_inputs = self.processor(text=[prompt], images=processed_images, videos=processed_videos, video_metadata=video_metadatas, return_tensors="pt", add_special_tokens=False, **video_kwargs)
+            model_inputs = self.processor(text=[prompt], images=processed_images, videos=processed_videos, video_metadata=video_metadatas, return_tensors="pt", add_special_tokens=False, do_resize=True, padding=True, **video_kwargs)
+            
             if "second_per_grid_ts" in self.processor.model_input_names:
                 model_inputs["second_per_grid_ts"] = [2.0 / video_sample_fps for video_sample_fps in video_fps_list]
             input_ids = model_inputs.pop("input_ids")[0]
@@ -361,19 +341,6 @@ class RLHFDataset(Dataset):
             images = example[self.image_key]
             videos = example[self.video_key]
             example["multi_modal_data"] = {"images": images, "videos": videos}
-
-            
-            video_token_id = 151656
-            n_video_tokens = (input_ids == video_token_id).sum().item()
-            video_grid_thw = model_inputs.get("video_grid_thw", None)
-            total_video_patches = int(video_grid_thw.prod(dim=1).sum().item())
-            print('-' * 20)
-            print("DEBUG: n_video_tokens_in_text =", n_video_tokens)
-            print("DEBUG: n_video_patches_from_grid =", total_video_patches)
-            
-            # print the full input_ids, do not truncate
-            print("DEBUG: input_ids =", input_ids.tolist())
-        
             
         elif self.image_key in example and len(example[self.image_key]) > 0:
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
@@ -460,47 +427,5 @@ class RLHFDataset(Dataset):
         example["position_ids"] = position_ids
         example["raw_prompt_ids"] = raw_prompt_ids
         example["ground_truth"] = example.pop(self.answer_key)
+        example["messages"] = messages
         return example
-
-            # # Handle both images and videos
-            # prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-            # images = example.pop(self.image_key)
-            # videos = example.pop(self.video_key)
-
-            # if self.image_dir is not None and len(images) != 0 and isinstance(images[0], str):  # image paths
-            #     images = [os.path.join(self.image_dir, image) for image in images]
-            # if self.image_dir is not None and len(videos) != 0 and isinstance(videos[0], str):  # video paths
-            #     videos = [os.path.join(self.image_dir, video) for video in videos]
-
-            # processed_images = [] if len(images) != 0 else None  # text-only data
-            # for image in images:
-            #     processed_images.append(process_image(image, resized_height=self.resized_height, resized_width=self.resized_width, min_pixels=self.min_pixels, max_pixels=self.max_pixels))
-
-            # processed_videos = [] if len(videos) != 0 else None  # text-only data
-            # video_metadatas = []
-            # video_fps_list = []
-            # for video in videos:
-            #     processed_video, video_fps = process_video(
-            #         video, nframes=self.nframes, resized_height=self.resized_height, resized_width=self.resized_width, return_fps=True, return_video_metadata=True
-            #     )
-            #     processed_video, video_metadata = processed_video
-            #     processed_videos.append(processed_video)
-            #     video_metadatas.append(video_metadata)
-            #     video_fps_list.append(video_fps)
-            
-            # # BC for qwen2.5-vl
-            # video_kwargs = {
-            #     'do_sample_frames': False,
-            #     'fps': video_fps_list,
-            # }
-            # # images, videos, video_kwargs = process_vision_info(messages, return_video_kwargs=True, return_video_metadata=True)
-
-            # model_inputs = self.processor(
-            #     text=[prompt], images=processed_images, videos=processed_videos, video_metadata=video_metadatas, add_special_tokens=False, return_tensors="pt", **video_kwargs
-            # )
-            # if "second_per_grid_ts" in self.processor.model_input_names:
-            #     model_inputs["second_per_grid_ts"] = [2.0 / video_sample_fps for video_sample_fps in video_fps_list]
-
-            # input_ids = model_inputs.pop("input_ids")[0]
-            # attention_mask = model_inputs.pop("attention_mask")[0]
-            # example["multi_modal_data"] = {"images": images, "videos": videos}
