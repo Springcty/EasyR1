@@ -26,6 +26,7 @@ from enum import IntEnum, auto
 from typing import Any, Optional, Type
 
 import numpy as np
+import pandas as pd
 import ray
 import torch
 from ray.experimental.tqdm_ray import tqdm
@@ -442,12 +443,21 @@ class RayPPOTrainer:
                 length_metrics_lst[key].append(value)
 
         self.actor_rollout_ref_wg.release_rollout_engine()
-        self._maybe_log_val_generations(sample_inputs, sample_outputs, sample_labels, sample_scores)
+        # self._maybe_log_val_generations(sample_inputs, sample_outputs, sample_labels, sample_scores)
+        # Combine sample_inputs, sample_outputs, sample_labels, sample_scores into a DataFrame
+        val_generations = pd.DataFrame(
+            {
+                "input": sample_inputs,
+                "output": sample_outputs,
+                "label": sample_labels,
+                "score": sample_scores,
+            }
+        )
         self.val_reward_score = torch.cat(reward_tensor_lst, dim=0).sum(-1).mean().item()
         val_reward_metrics = {f"val/{key}_reward": value for key, value in reduce_metrics(reward_metrics_lst).items()}
         val_length_metrics = {f"val_{key}": value for key, value in reduce_metrics(length_metrics_lst).items()}
         print("Finish validation.")
-        return {"val/reward_score": self.val_reward_score, **val_reward_metrics, **val_length_metrics}
+        return {"val/reward_score": self.val_reward_score, **val_reward_metrics, **val_length_metrics}, val_generations
 
     def _balance_batch(self, batch: DataProto, metrics: dict[str, Any], logging_prefix: str = "global_seqlen") -> None:
         """Reorder the data on single controller such that each dp rank gets similar total tokens"""
@@ -582,7 +592,12 @@ class RayPPOTrainer:
         # perform validation before training
         # currently, we only support validation using the reward_function.
         if self.val_reward_fn is not None and self.config.trainer.val_before_train:
-            val_metrics = self._validate()
+            val_metrics, val_generations = self._validate()
+            # Save the validation generations before training to a CSV file
+            val_generations.to_csv(
+                os.path.join(self.config.trainer.save_checkpoint_path, f"val_generations_step_{self.global_step}.csv"),
+                index=False,
+            )
             self.logger.log(data=val_metrics, step=self.global_step)
             if self.config.trainer.val_only:
                 return
@@ -676,11 +691,20 @@ class RayPPOTrainer:
                     and self.global_step % self.config.trainer.val_freq == 0
                 ):
                     with timer("validation", timing_raw):
-                        val_metrics = self._validate()
+                        val_metrics, val_generations = self._validate()
 
                     metrics.update(val_metrics)
 
                 if self.config.trainer.save_freq > 0 and self.global_step % self.config.trainer.save_freq == 0:
+                    if self.val_reward_score > self.best_val_reward_score:
+                        # Save the current best validation generations to a CSV file
+                        val_generations.to_csv(
+                            os.path.join(
+                                self.config.trainer.save_checkpoint_path,
+                                f"best_val_generations_step_{self.global_step}.csv",
+                            ),
+                            index=False,
+                        )
                     with timer("save_checkpoint", timing_raw):
                         self._save_checkpoint()
 

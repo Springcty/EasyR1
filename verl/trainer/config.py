@@ -41,7 +41,7 @@ class DataConfig:
     image_key: str = "images"
     video_key: str = "videos"
     image_dir: Optional[str] = None
-    video_fps: float = 2.0
+    video_fps: Optional[float] = None
     max_prompt_length: int = 512
     max_response_length: int = 512
     rollout_batch_size: int = 512
@@ -58,6 +58,8 @@ class DataConfig:
     nframes: Optional[int] = None
     resized_height: Optional[int] = 28
     resized_width: Optional[int] = 28
+    sabotage_key: Optional[str] = None
+    sabotage_ratio: float = 0.5  # ratio of samples with sabotage information
 
     def post_init(self):
         self.image_dir = get_abs_path(self.image_dir, prompt="Image directory")
@@ -145,6 +147,8 @@ class TrainerConfig:
             self.save_checkpoint_path = os.path.join("checkpoints", self.project_name, self.experiment_name)
 
         self.save_checkpoint_path = os.path.abspath(self.save_checkpoint_path)  # may be not exist
+        self.save_checkpoint_path = os.path.join(self.save_checkpoint_path, self.project_name, self.experiment_name)
+        
         self.load_checkpoint_path = get_abs_path(self.load_checkpoint_path, prompt="Model checkpoint")
 
 

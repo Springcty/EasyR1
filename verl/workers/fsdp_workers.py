@@ -42,7 +42,6 @@ from ..protocol import DataProto
 from ..single_controller.base import Worker
 from ..single_controller.base.decorator import Dispatch, register
 from ..utils.checkpoint.fsdp_checkpoint_manager import FSDPCheckpointManager
-from ..utils.dataset import process_image, process_video
 from ..utils.flops_counter import FlopsCounter
 from ..utils.fsdp_utils import (
     get_fsdp_wrap_policy,
