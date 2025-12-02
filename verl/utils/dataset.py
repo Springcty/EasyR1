@@ -368,4 +368,6 @@ class RLHFDataset(Dataset):
         example["raw_prompt_ids"] = raw_prompt_ids
         example["ground_truth"] = example.pop(self.answer_key)
         example["messages"] = messages
+        example["sample_id"] = example.pop("sample_id")
+        
         return example

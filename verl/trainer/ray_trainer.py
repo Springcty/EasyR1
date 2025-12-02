@@ -393,7 +393,7 @@ class RayPPOTrainer:
     def _validate(self) -> dict[str, Any]:
         reward_tensor_lst = []
         # Lists to collect samples for the table
-        sample_inputs, sample_outputs, sample_labels, sample_scores = [], [], [], []
+        sample_inputs, sample_outputs, sample_labels, sample_scores, sample_ids = [], [], [], [], []
         reward_metrics_lst = defaultdict(list)
         length_metrics_lst = defaultdict(list)
         print("Start validation...")
@@ -434,6 +434,7 @@ class RayPPOTrainer:
             sample_outputs.extend(output_texts)
             sample_labels.extend(test_batch.non_tensor_batch["ground_truth"].tolist())
             sample_scores.extend(scores)
+            sample_ids.extend(test_batch.non_tensor_batch["sample_id"].tolist())
 
             reward_tensor_lst.append(reward_tensor)
             for key, value in reward_metrics.items():
@@ -447,6 +448,7 @@ class RayPPOTrainer:
         # Combine sample_inputs, sample_outputs, sample_labels, sample_scores into a DataFrame
         val_generations = pd.DataFrame(
             {
+                "sample_id": sample_ids,
                 "input": sample_inputs,
                 "output": sample_outputs,
                 "label": sample_labels,
