@@ -726,7 +726,7 @@ class RayPPOTrainer:
                 or self.config.trainer.val_freq <= 0
                 or self.global_step % self.config.trainer.val_freq != 0
             ):
-                val_metrics = self._validate()
+                val_metrics, val_generations = self._validate()
                 self.logger.log(data=val_metrics, step=self.global_step)
 
             print(f"Final validation metrics:\n{convert_dict_to_str(unflatten_dict(val_metrics))}")
