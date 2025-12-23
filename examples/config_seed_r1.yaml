@@ -23,8 +23,7 @@ data:
   resized_height: 28
   resized_width: 28
   video_fps: 2.0
-  sabotage_key: sabotage_key
-  sabotage_ratio: 0.5
+  sabotage_key: null
 
 algorithm:
   adv_estimator: grpo
