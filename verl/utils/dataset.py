@@ -201,40 +201,51 @@ class RLHFDataset(Dataset):
 
         if self.image_key not in example and self.video_key not in example:
             return [{"role": "user", "content": prompt_str}]
+
+        video_path = ''
+        image_path = ''
+        if self.video_key in example and len(example[self.video_key]) > 0:
+            video_path = example[self.video_key][0]
+            if self.image_dir is not None and video_path != '':
+                video_path = os.path.join(self.image_dir, video_path)
+        if self.image_key in example and len(example[self.image_key]) > 0:
+            image_path = example[self.image_key][0]
+            if self.image_dir is not None:
+                image_path = os.path.join(self.image_dir, image_path)
         
         content_list = []
-        if self.image_key in example and self.video_key in example and len(example[self.image_key]) > 0 and len(example[self.video_key]) > 0 and example[self.video_key][0] != '':
+        if video_path != '' and image_path != '':
             for i, content in enumerate(prompt_str.split("<video>\n<image>")):
                 if i != 0:
                     if self.nframes is not None:
-                        content_list.append({"type": "video", "video": example[self.video_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width, "nframes": self.nframes})
+                        content_list.append({"type": "video", "video": video_path, "resized_height": self.resized_height, "resized_width": self.resized_width, "nframes": self.nframes})
                     else:
-                        content_list.append({"type": "video", "video": example[self.video_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width, "fps": self.video_fps})
+                        content_list.append({"type": "video", "video": video_path, "resized_height": self.resized_height, "resized_width": self.resized_width, "fps": self.video_fps})
                     
-                    content_list.append({"type": "image", "image": example[self.image_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width})
+                    content_list.append({"type": "image", "image": image_path, "resized_height": self.resized_height, "resized_width": self.resized_width})
                 
                 if content:
                     if self.sabotage_key is not None and self.sabotage_key in example and np.random.rand() < self.sabotage_ratio:
                         content_list.append({"type": "text", "text": content + "\n" + example[self.sabotage_key]})
                     else:
                         content_list.append({"type": "text", "text": content})
-        elif self.image_key in example and len(example[self.image_key]) > 0:
+        elif image_path != '':
             # https://huggingface.co/docs/transformers/en/tasks/image_text_to_text
             for i, content in enumerate(prompt_str.split("<video>\n<image>")):
                 if i != 0:
-                    content_list.append({"type": "image", "image": example[self.image_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width})
+                    content_list.append({"type": "image", "image": image_path, "resized_height": self.resized_height, "resized_width": self.resized_width})
                 if content:
                     if self.sabotage_key is not None and self.sabotage_key in example and np.random.rand() < self.sabotage_ratio:
                         content_list.append({"type": "text", "text": content + "\n" + example[self.sabotage_key]})
                     else:
                         content_list.append({"type": "text", "text": content})
-        elif self.video_key in example and len(example[self.video_key]) > 0 and example[self.video_key][0] != '':
+        elif video_path != '':
             for i, content in enumerate(prompt_str.split("<video>\n<image>")):
                 if i != 0:
                     if self.nframes is not None:
-                        content_list.append({"type": "video", "video": example[self.video_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width, "nframes": self.nframes})
+                        content_list.append({"type": "video", "video": video_path, "resized_height": self.resized_height, "resized_width": self.resized_width, "nframes": self.nframes})
                     else:
-                        content_list.append({"type": "video", "video": example[self.video_key][0], "resized_height": self.resized_height, "resized_width": self.resized_width, "fps": self.video_fps})
+                        content_list.append({"type": "video", "video": video_path, "resized_height": self.resized_height, "resized_width": self.resized_width, "fps": self.video_fps})
 
                 if content:
                     if self.sabotage_key is not None and self.sabotage_key in example and np.random.rand() < self.sabotage_ratio:
@@ -254,7 +265,7 @@ class RLHFDataset(Dataset):
             for video_path in example[self.video_key]:
                 if isinstance(video_path, str):
                     full_path = video_path
-                    if self.image_dir is not None:
+                    if self.image_dir is not None and video_path != '':
                         full_path = os.path.join(self.image_dir, video_path)
                     if full_path and not os.path.exists(full_path):
                         print(f"Video path does not exist: {full_path}")
@@ -303,26 +314,38 @@ class RLHFDataset(Dataset):
             video_metadatas = None
         model_inputs = self.processor(text=[prompt], images=processed_images, videos=processed_videos, video_metadata=video_metadatas, return_tensors="pt", add_special_tokens=False, do_resize=True, padding=True, **video_kwargs)
         
-        if self.image_key in example and self.video_key in example and len(example[self.image_key]) > 0 and len(example[self.video_key]) > 0 and example[self.video_key][0] != '':                
+        
+        video_path = ''
+        image_path = ''
+        if self.video_key in example and len(example[self.video_key]) > 0:
+            video_path = example[self.video_key][0]
+            if self.image_dir is not None and video_path != '':
+                video_path = os.path.join(self.image_dir, video_path)
+        if self.image_key in example and len(example[self.image_key]) > 0:
+            image_path = example[self.image_key][0]
+            if self.image_dir is not None:
+                image_path = os.path.join(self.image_dir, image_path)
+
+        if image_path != '' and video_path != '':                
             video_fps_list = video_kwargs.get('fps', None)
             if "second_per_grid_ts" in self.processor.model_input_names:
                 model_inputs["second_per_grid_ts"] = [2.0 / video_sample_fps for video_sample_fps in video_fps_list]
 
             input_ids = model_inputs.pop("input_ids")[0]
             attention_mask = model_inputs.pop("attention_mask")[0]
-            example["multi_modal_data"] = {"images": example[self.image_key], "videos": example[self.video_key]}
-        elif self.image_key in example and len(example[self.image_key]) > 0:
+            example["multi_modal_data"] = {"images": [image_path], "videos": [video_path]}
+        elif image_path != '':
             input_ids = model_inputs.pop("input_ids")[0]
             attention_mask = model_inputs.pop("attention_mask")[0]
-            example["multi_modal_data"] = {"images": example[self.image_key]}
-        elif self.video_key in example and len(example[self.video_key]) > 0 and example[self.video_key][0] != '':
+            example["multi_modal_data"] = {"images": [image_path]}
+        elif video_path != '':
             video_fps_list = video_kwargs.get('fps', None)
             if "second_per_grid_ts" in self.processor.model_input_names:
                 model_inputs["second_per_grid_ts"] = [2.0 / video_sample_fps for video_sample_fps in video_fps_list]
 
             input_ids = model_inputs.pop("input_ids")[0]
             attention_mask = model_inputs.pop("attention_mask")[0]
-            example["multi_modal_data"] = {"videos": example[self.video_key]}
+            example["multi_modal_data"] = {"videos": [video_path]}
 
         if self.processor is not None and "Qwen2VLImageProcessor" in self.processor.image_processor.__class__.__name__:
             # qwen-vl mrope

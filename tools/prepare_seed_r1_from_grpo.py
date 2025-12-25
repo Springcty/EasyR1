@@ -58,7 +58,7 @@ def main():
                     default=["annotations/validation_L1.jsonl",
                              "annotations/validation_L2.jsonl",
                              "annotations/validation_L3.jsonl"])
-    ap.add_argument("--out_dir", default="/data/user_data/tianyuca/RL_sabotage/SEED-Bench-R1/RL")
+    ap.add_argument("--out_dir", default="/data/user_data/tianyuca/RL_sabotage/SEED-Bench-R1/train_val_parquet")
     ap.add_argument("--shuffle_choices", action="store_true",
                     help="Shuffle A-D per sample with a deterministic seed (recommended).")
     args = ap.parse_args()
@@ -76,19 +76,20 @@ def main():
             row_dict["prompt"] = chat
             
             progress_metadata = ex.get("task_progress_metadata", None)
-            if progress_metadata is not None:
+            if progress_metadata is not None and len(progress_metadata) > 0:
                 metadata = ''
                 for step_number, item in enumerate(progress_metadata):
                     metadata += f"Step {step_number + 1}: {item['narration_text']} "
                 progress_metadata = SABOTAGE_TEMPLATE.format(task_progress_metadata=metadata)
+            else:
+                progress_metadata = None
             row_dict["sabotage_key"] = progress_metadata
-                
 
-            image_path = os.path.join(root, "images", ex['video_source'], ex['current_observation_basename'])
+            image_path = os.path.join("images", ex['video_source'], ex['current_observation_basename'])
             row_dict["images"] = [image_path]
 
             if len(ex["task_progress_metadata"]) > 0:
-                video_path = os.path.join(root, "videos", ex['video_source'], ex['video_basename'])
+                video_path = os.path.join("videos", ex['video_source'], ex['video_basename'])
             else:
                 video_path = ''
             row_dict["videos"] = [video_path] if video_path != '' else []
@@ -108,17 +109,18 @@ def main():
         df.to_parquet(out_parquet, index=False)
         print(f"[OK] wrote {len(df)} → {out_parquet}")
 
-    # # train
-    convert_split(str(root / args.train_jsonl), str(Path(args.out_dir) / "train_w_task_progress.parquet"))
+    # train
+    convert_split(str(root / args.train_jsonl), str(Path(args.out_dir) / "train.parquet"))
+    
     # val (merge L1/L2/L3)
-    # tmp = []
-    # for i, vj in enumerate(args.val_jsonl):
-    #     p = Path(args.out_dir) / f"val_L{i+1}.parquet"
-    #     convert_split(str(root / vj), str(p))
-    #     tmp.append(p)
-    # pd.concat([pd.read_parquet(p) for p in tmp]).reset_index(drop=True)\
-    #   .to_parquet(str(Path(args.out_dir) / "val.parquet"), index=False)
-    # print("[OK] merged validation →", Path(args.out_dir) / "val.parquet")
+    tmp = []
+    for i, vj in enumerate(args.val_jsonl):
+        p = Path(args.out_dir) / f"val_L{i+1}.parquet"
+        convert_split(str(root / vj), str(p))
+        tmp.append(p)
+    pd.concat([pd.read_parquet(p) for p in tmp]).reset_index(drop=True)\
+      .to_parquet(str(Path(args.out_dir) / "val.parquet"), index=False)
+    print("[OK] merged validation →", Path(args.out_dir) / "val.parquet")
 
 if __name__ == "__main__":
     main()
