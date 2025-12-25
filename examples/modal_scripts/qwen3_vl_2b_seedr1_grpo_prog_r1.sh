@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROJECT_NAME=easyr1_seed_r1_grpo
-EXPERIMENT_NAME=qwen3_vl_2b_default_e5_val1_v2
+EXPERIMENT_NAME=qwen3_vl_2b_prog_r1_e5_val1
 MODEL_PATH=Qwen/Qwen3-VL-2B-Instruct
 
 TRAIN_FILES=${TRAIN_FILES:-"data/train_val_parquet/train.parquet"}
@@ -15,6 +15,8 @@ python3 -m verl.trainer.main \
   data.train_files=$TRAIN_FILES \
   data.val_files=$VAL_FILES \
   data.image_dir=$IMAGE_DIR \
+  data.sabotage_key=sabotage_key \
+  data.sabotage_ratio=1.0 \
   data.seed=42 \
   data.video_fps=2.0 \
   data.nframes=null \

@@ -12,7 +12,7 @@ image = (
     )
 )
 
-app = modal.App("easyr1-qwen3-vl-2b-seedr1-grpo")
+app = modal.App("easyr1-qwen3-vl-2b-seedr1-grpo-default")
 
 # 2. Define Volumes
 # Connect to your EXISTING data volume
