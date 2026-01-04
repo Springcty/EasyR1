@@ -6,7 +6,7 @@ image = (
     modal.Image.from_registry("tianyuc/easyr1-seedbench:v1")
     .pip_install("wandb")
     .add_local_dir(
-        "/home/tianyuca/EasyR1", 
+        "/Users/ty_cao/Documents/CODE/QuestionAugmented/EasyR1", 
         remote_path="/root/EasyR1",
         ignore=["logs", "wandb", ".git", ".gitignore"]
     )
@@ -24,8 +24,12 @@ hf_cache_vol = modal.Volume.from_name("easyr1-hf-cache", create_if_missing=True)
 
 @app.function(
     image=image,
-    gpu="H100:8",
-    timeout=86400,
+    gpu="A100-80GB:4",
+    timeout=86400,          # 24 hours (Max limit)
+    retries=modal.Retries(  # Add retries to restart after timeout
+        max_retries=10,
+        initial_delay=10.0,
+    ),
     # 3. Mount Volumes
     volumes={
         "/root/EasyR1/data": data_vol,           # Mounts your 'RL', 'images', 'videos' to data/
@@ -45,12 +49,16 @@ def train():
     print("Checking data volume...")
     subprocess.run("ls -F data/", shell=True) 
     
-    script_path = "examples/modal_scripts/qwen3_vl_2b_seedr1_grpo_default.sh"
+    script_path = "examples/modal_scripts/qwen3_vl_2b_seedr1_grpo_prog_r1.sh"
     subprocess.run(["chmod", "+x", script_path], check=True)
     
     print(f"Starting training: {script_path}")
     subprocess.run(f"bash {script_path}", shell=True, check=True)
 
-if __name__ == "__main__":
-    with app.run():
-        train.remote()
+# if __name__ == "__main__":
+    # with app.run():
+        # train.remote()
+@app.local_entrypoint()
+def main():
+    print("Starting interruptible training experiment")
+    train.spawn().get()
