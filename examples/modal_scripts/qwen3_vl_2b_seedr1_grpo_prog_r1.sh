@@ -22,11 +22,13 @@ python3 -m verl.trainer.main \
   data.nframes=null \
   data.rollout_batch_size=32 \
   data.val_batch_size=128 \
-  worker.actor.global_batch_size=8 \
+  worker.actor.global_batch_size=4 \
   worker.actor.model.model_path=$MODEL_PATH \
   worker.rollout.tensor_parallel_size=1 \
-  trainer.n_gpus_per_node=8 \
+  trainer.n_gpus_per_node=4 \
   trainer.save_checkpoint_path=$CKPT_PATH \
+  trainer.find_last_checkpoint=true \
+  trainer.save_limit=2  \
   trainer.val_before_train=true \
   trainer.total_epochs=5 \
   trainer.project_name=$PROJECT_NAME \
