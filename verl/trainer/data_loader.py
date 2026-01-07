@@ -78,6 +78,8 @@ def create_dataloader(config: DataConfig, tokenizer: PreTrainedTokenizer, proces
         answer_key=config.answer_key,
         image_key=config.image_key,
         video_key=config.video_key,
+        sabotage_key=config.sabotage_key if config.val_sabotage else None,
+        sabotage_ratio=config.sabotage_ratio,
         image_dir=config.image_dir,
         video_fps=config.video_fps,
         max_prompt_length=config.max_prompt_length,

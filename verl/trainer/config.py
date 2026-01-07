@@ -60,6 +60,7 @@ class DataConfig:
     resized_width: Optional[int] = 28
     sabotage_key: Optional[str] = None
     sabotage_ratio: float = 0.5  # ratio of samples with sabotage information
+    val_sabotage: bool = False  # whether to perform sabotage during validation
 
     def post_init(self):
         self.image_dir = get_abs_path(self.image_dir, prompt="Image directory")

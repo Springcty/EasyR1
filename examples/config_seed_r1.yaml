@@ -23,7 +23,8 @@ data:
   resized_height: 28
   resized_width: 28
   video_fps: 2.0
-  sabotage_key: null
+  sabotage_key: null  # sabotage_key of val set is always None
+  val_sabotage: false  # whether to perform sabotage during validation
 
 algorithm:
   adv_estimator: grpo
