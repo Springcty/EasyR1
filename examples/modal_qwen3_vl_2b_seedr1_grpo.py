@@ -8,7 +8,7 @@ image = (
     .add_local_dir(
         "/Users/ty_cao/Documents/CODE/QuestionAugmented/EasyR1", 
         remote_path="/root/EasyR1",
-        ignore=["logs", "wandb", ".git", ".gitignore"]
+        ignore=["logs", "wandb", ".git", ".gitignore", "results"]
     )
 )
 
@@ -49,7 +49,7 @@ def train():
     print("Checking data volume...")
     subprocess.run("ls -F data/", shell=True) 
     
-    script_path = "examples/modal_scripts/qwen3_vl_2b_seedr1_grpo_prog_r1.sh"
+    script_path = "examples/modal_scripts/qwen3_vl_2b_seedr1_grpo_eval.sh"
     subprocess.run(["chmod", "+x", script_path], check=True)
     
     print(f"Starting training: {script_path}")
